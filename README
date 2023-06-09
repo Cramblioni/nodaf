@@ -1,0 +1,29 @@
+# nodaf
+## (Cym)
+
+mae `nodaf` yn raglen siml am nodu syniadau. Mae mor syml â hynny. Mae'r
+llinell cyntaf yw'r teitl, y gweddill yw'r corff.
+
+Cyn rhedeg `nodaf` wnewch siwr bod `$XDG_DATA_HOME` wedi osod. Bydd `nodaf`
+yn creu `$XDG_DATA_HOME/nodaf` iddwch.
+I creu nodyn ```
+[llwybr nodaf] newidd [enw nodyn]
+```
+I darllen nodyn ```
+[llwybr nodaf] gafael [enw nodyn]
+```
+
+
+## (Eng) I note
+
+`nodaf` is a simple program for noting down ideas. That's it.
+the first line is the title, the rest is the body.
+
+Before running `nodaf` make sure that you have `$XDG_DATA_HOME` set. `nodaf`
+will create `$XDG_DATA_HOME/nodaf` for you.
+To create a note ```
+[path to nodaf] new [note name]
+```
+To read a note ```
+[path to nodaf] get [note name]
+```

@@ -1,0 +1,9 @@
+[package]
+name = "nodaf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cramble"]
+readme = "./README"
+description = "A spur of the moment note taking app"
+
+[dependencies]
