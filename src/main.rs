@@ -66,7 +66,7 @@ fn main() -> io::Result<()> {
             }
             "test" => {
                 // fucking indexing shit.
-                let mut corpus = Corpus::new(Vec::new());
+                let mut corpus = Vec::new();
                 let paths = std::fs::read_dir(&basedir)?.filter(|x| {
                     let thingy = unwrap_or_drop!(x.as_ref()).metadata();
                     let m = unwrap_or_drop!(thingy.as_ref());
@@ -87,11 +87,12 @@ fn main() -> io::Result<()> {
                     let data = unsafe { String::from_utf8_unchecked(fs::read(file)?) };
 
                     if let Some(doc) = Document::new(file.to_str().unwrap().to_string(), data) {
-                        corpus.1.push(doc);
+                        corpus.push(doc);
                     } else {
                         eprintln!("Cannot open note {:?}", file);
                     }
                 }
+                let corpus = Corpus::new(corpus);
                 println!("{corpus:?}");
             }
             x => {
@@ -135,80 +136,39 @@ fn nodain_get(enw: &str, sylfaen: &Path) -> io::Result<()> {
     Ok(())
 }
 
-struct Tocynnudd<'a> {
-    sylfaen: &'a str,
-    ffynhonell: &'a [u8],
-    gwth: usize,
-}
+struct Tocynnudd<'a>(std::iter::Peekable<std::str::CharIndices<'a>>, &'a str);
 
 impl<'a> Tocynnudd<'a> {
     fn new(sylfaen: &'a str) -> Self {
-        Tocynnudd {
-            sylfaen,
-            ffynhonell: sylfaen.as_bytes(),
-            gwth: 0,
+        Tocynnudd (sylfaen.char_indices().peekable(), sylfaen)
+    }
+    fn toc_skip(&mut self) {
+        while let Some((_, toc)) = self.0.next() {
+            if toc.is_alphanumeric() {
+                break;
+            }
         }
     }
 }
 
-fn utf8_size(me: u8) -> Option<u32> {
-    if me & 0x80u8 == 0 {
-        return Some(1);
-    }
-    if me & 0xc0u8 == 0x80u8 {
-        return None;
-    }
-    Some(me.leading_ones())
-}
 
-fn utf8_from_bytes(me: &[u8]) -> char {
-    // beth os me.len() == 0?
-    if me.len() == 1 {
-        return me[0] as char;
-    }
-    let mut out = (me[0] & (0xffu8 >> me.len())) as u32;
-    for i in me.iter().skip(1) {
-        out <<= 6;
-        out += (i & 0x3f) as u32;
-    }
-    unsafe { char::from_u32_unchecked(out) }
-}
-
-fn is_utf8_start(me: u8) -> bool {
-    me & 0x80u8 == 0 || me & 0xc0u8 != 0x80u8
-}
-
-fn cam_mlaen(me: &Tocynnudd<'_>) -> Option<(char, u32)> {
-    let hyd = utf8_size(*me.ffynhonell.get(me.gwth)?)?;
-    assert!(hyd > 0, "indecs {}:{:08b}", me.gwth, me.ffynhonell[me.gwth]);
-    let temp = utf8_from_bytes(&me.ffynhonell[me.gwth..me.gwth + hyd as usize]);
-    Some((temp, hyd))
-}
-
-fn toc_skip(me: &mut Tocynnudd<'_>) {
-    while let Some((toc, hyd)) = cam_mlaen(me) {
-        if toc.is_alphanumeric() {
-            break;
-        }
-        me.gwth += hyd as usize;
-    }
-}
 
 impl<'a> Iterator for Tocynnudd<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<Self::Item> {
-        toc_skip(self);
-        if self.gwth >= self.ffynhonell.len() {
-            return None;
-        }
-        let dech = self.gwth;
-        while let Some((toc, hyd)) = cam_mlaen(self) {
+        self.toc_skip();
+        let dech = {
+            let (len, chr) = self.0.peek()?;
+            len.saturating_sub(chr.len_utf8())
+        };
+        while let Some((_, toc)) = self.0.peek() {
             if !toc.is_alphanumeric() {
                 break;
             }
-            self.gwth += hyd as usize;
+            let _ = self.0.next();
         }
-        Some(&self.sylfaen[dech..self.gwth])
+        let diwe = self.0.next().map(|x| x.0).unwrap_or(self.1.len());
+        Some(&self.1[dech .. diwe])
     }
 }
 
