@@ -68,6 +68,15 @@ fn main() -> io::Result<()> {
                     break 'selection;
                 }
             }
+            "edit" | "golygu" => {
+                if let Some(enw) = argv.next() {
+                    nodain_edit(&enw, &basedir)?;
+                } else {
+                    println!("rowch enw nodyn os gwelwch yn dda");
+                    println!("please provide note name");
+                    break 'selection;
+                }
+            }
             "search-noind" | "cgwilio-dimyn" => {
                 // fucking indexing shit.
                 let mut corpus = Vec::new();
@@ -158,6 +167,20 @@ fn nodain_get(enw: &str, sylfaen: &Path) -> io::Result<()> {
     io::copy(&mut fs::File::open(&targed)?, &mut stdout())?;
     Ok(())
 }
+
+fn nodain_edit(enw: &str, sylfaen: &Path) -> io::Result<()> {
+    // check if it doesn't exist [if it does then return]
+    let mut targed = sylfaen.join(enw);
+    targed.set_extension("nod");
+    if !targed.exists() {
+        println!("nid ydy nodyn o enw '{}' yn bodoli", enw);
+        println!("note of name '{}' doesn't exists", enw);
+        return Ok(());
+    }
+    process::Command::new("nano").arg(targed).spawn()?.wait()?;
+    Ok(())
+}
+
 
 struct Tocynnudd<'a>(std::iter::Peekable<std::str::CharIndices<'a>>, &'a str);
 
