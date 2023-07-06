@@ -41,7 +41,9 @@ fn main() -> io::Result<()> {
         fs::create_dir(&basedir)?;
     }
     let mut argv = env::args().skip(1);
-    let command = if let Some(comm) = argv.next() { comm } else {
+    let command = if let Some(comm) = argv.next() {
+        comm
+    } else {
         println!("rowch orchymyn os gwelwch yn dda.");
         println!("Please provide a command");
         return Ok(());
@@ -80,22 +82,41 @@ fn main() -> io::Result<()> {
                             .unwrap_or(false)
                 });
                 for file in paths.map(|x| x.map(|x| x.path())) {
-                    let file = if let Ok(sfile) = file.as_ref() {
+                    let mut file = if let Ok(sfile) = file {
                         sfile
                     } else {
-                        eprintln!("ERROR: {}", file.as_ref().unwrap_err());
                         return Err(io::Error::new(io::ErrorKind::Other, file.unwrap_err()));
                     };
-                    let data = unsafe { String::from_utf8_unchecked(fs::read(file)?) };
-
-                    if let Some(doc) = Document::new(file.to_str().unwrap().to_string(), data) {
+                    let data = unsafe { String::from_utf8_unchecked(fs::read(file.as_path())?) };
+                    file.set_extension("");
+                    let source = file
+                        .file_name()
+                        .and_then(|p| p.to_str())
+                        .map(ToOwned::to_owned)
+                        .unwrap();
+                    if let Some(doc) = Document::new(source, data) {
                         corpus.push(doc);
                     } else {
-                        eprintln!("Cannot open note {:?}", file);
                     }
                 }
+                let mut scores = Vec::with_capacity(corpus.len());
                 let corpus = Corpus::new(corpus);
-                println!("{corpus:?}");
+                if let Some(terms) = argv.next() {
+                    let terms: Vec<_> = Tocynnudd::new(&terms).collect();
+                    for doc in corpus.1.iter() {
+                        let score = score_doc(doc, &terms, &corpus);
+                        scores.push((score, doc.title.as_str(), doc.path.as_str()));
+                    }
+                    scores
+                        .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                } else {
+                    for doc in corpus.1.iter() {
+                        scores.push((0f64, &doc.title, &doc.path))
+                    }
+                }
+                for (_, title, doc) in scores.into_iter().rev() {
+                    println!("{doc}: {title}");
+                }
             }
             x => {
                 println!("gorchymyn heb gydnabod '{}'", x);
@@ -142,7 +163,7 @@ struct Tocynnudd<'a>(std::iter::Peekable<std::str::CharIndices<'a>>, &'a str);
 
 impl<'a> Tocynnudd<'a> {
     fn new(sylfaen: &'a str) -> Self {
-        Tocynnudd (sylfaen.char_indices().peekable(), sylfaen)
+        Tocynnudd(sylfaen.char_indices().peekable(), sylfaen)
     }
     fn toc_skip(&mut self) {
         while let Some((_, toc)) = self.0.next() {
@@ -168,7 +189,7 @@ impl<'a> Iterator for Tocynnudd<'a> {
             let _ = self.0.next();
         }
         let diwe = self.0.next().map(|x| x.0).unwrap_or(self.1.len());
-        Some(&self.1[dech .. diwe])
+        Some(&self.1[dech..diwe])
     }
 }
 
@@ -222,34 +243,21 @@ fn doc_freq<'a>(docs: &'a [Document]) -> HashMap<String, u32> {
     }
     out
 }
-mod magic {
-    use super::*;
-    use std::ptr;
-    fn fuckyou<'a, I: 'a, T>(x: I) -> &'a T {
-        unsafe { *ptr::addr_of!(x).cast::<&T>() }
-    }
-    pub fn score_doc(doc: &Document, terms: &[&str], corpus: &Corpus) -> f64 {
-        let mut score = 0f64;
-        for term in terms {
-            let nt = doc
-                .index
-                .get(fuckyou::<&str, String>(term))
-                .copied()
-                .unwrap_or(0u32) as f64;
-            let tt = doc.index.values().copied().sum::<u32>() as f64;
-            let tf = nt / tt;
+pub fn score_doc(doc: &Document, terms: &[&str], corpus: &Corpus) -> f64 {
+    let mut score = 0f64;
+    let mut buff =
+        String::with_capacity(corpus.0.keys().map(|x| x.len()).max().unwrap_or_default());
+    for term in terms {
+        buff.truncate(0);
+        buff.push_str(term);
+        let num_terms = doc.index.get(&buff).copied().unwrap_or(0u32) as f64;
+        let total = doc.index.values().copied().sum::<u32>() as f64;
+        let term_frequency = num_terms / total;
 
-            let idf = f64::log10(
-                corpus.1.len() as f64
-                    / (1 + corpus
-                        .0
-                        .get(fuckyou::<&str, String>(term))
-                        .copied()
-                        .unwrap_or(0)) as f64,
-            );
-            score += tf / idf;
-        }
-        score
+        let idf_pl = corpus.1.len() as f64 / (corpus.0.get(&buff).copied().unwrap_or(0) as f64);
+        let idf = f64::log10(idf_pl);
+        score += term_frequency / (16f64 + idf);
     }
+    println!("\t{}: {score}", doc.title);
+    score
 }
-use magic::score_doc;
