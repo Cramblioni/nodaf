@@ -40,31 +40,33 @@ fn main() -> io::Result<()> {
         );
         fs::create_dir(&basedir)?;
     }
-    let argv: Vec<String> = env::args().collect();
-    if argv.len() < 2 {
+    let mut argv = env::args().skip(1);
+    let command = if let Some(comm) = argv.next() { comm } else {
         println!("rowch orchymyn os gwelwch yn dda.");
         println!("Please provide a command");
         return Ok(());
-    }
+    };
     'selection: {
-        match argv[1].as_str() {
+        match command.as_str() {
             "get" | "gafael" => {
-                if argv.len() < 3 {
+                if let Some(enw) = argv.next() {
+                    nodain_get(&enw, &basedir)?;
+                } else {
                     println!("rowch enw nodyn os gwelwch yn dda");
                     println!("please provide note name");
                     break 'selection;
                 }
-                nodain_get(&argv[2], &basedir)?;
             }
             "new" | "newidd" => {
-                if argv.len() < 3 {
+                if let Some(enw) = argv.next() {
+                    nodain_new(&enw, &basedir)?;
+                } else {
                     println!("rowch enw nodyn os gwelwch yn dda");
-                    println!("please provide a note name");
+                    println!("please provide note name");
                     break 'selection;
                 }
-                nodain_new(&argv[2], &basedir)?;
             }
-            "test" => {
+            "search-noind" | "cgwilio-dimyn" => {
                 // fucking indexing shit.
                 let mut corpus = Vec::new();
                 let paths = std::fs::read_dir(&basedir)?.filter(|x| {
@@ -150,8 +152,6 @@ impl<'a> Tocynnudd<'a> {
         }
     }
 }
-
-
 
 impl<'a> Iterator for Tocynnudd<'a> {
     type Item = &'a str;
