@@ -40,6 +40,13 @@ fn main() -> io::Result<()> {
         );
         fs::create_dir(&basedir)?;
     }
+
+    // options
+    let mut editor = match env::var_os("EDITOR") {
+        Some(x) => {Some(x.into_string().unwrap())},
+        None => {Some(String::from("nano"))}
+    };
+
     let mut argv = env::args().skip(1);
     let command = if let Some(comm) = argv.next() {
         comm
@@ -61,7 +68,7 @@ fn main() -> io::Result<()> {
             }
             "new" | "newidd" => {
                 if let Some(enw) = argv.next() {
-                    nodain_new(&enw, &basedir)?;
+                    nodain_new(&enw, &basedir, editor.as_deref())?;
                 } else {
                     println!("rowch enw nodyn os gwelwch yn dda");
                     println!("please provide note name");
@@ -70,7 +77,7 @@ fn main() -> io::Result<()> {
             }
             "edit" | "golygu" => {
                 if let Some(enw) = argv.next() {
-                    nodain_edit(&enw, &basedir)?;
+                    nodain_edit(&enw, &basedir, editor.as_deref())?;
                 } else {
                     println!("rowch enw nodyn os gwelwch yn dda");
                     println!("please provide note name");
@@ -136,7 +143,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn nodain_new(enw: &str, sylfaen: &Path) -> io::Result<()> {
+fn nodain_new(enw: &str, sylfaen: &Path, edit: Option<&str>) -> io::Result<()> {
     // check if it doesn't exist [if it does then return]
     let mut targed = sylfaen.join(enw);
     targed.set_extension("nod");
@@ -151,8 +158,9 @@ fn nodain_new(enw: &str, sylfaen: &Path) -> io::Result<()> {
     let mut file = fs::File::create(&targed)?;
     let _ = file.write(b"\nysgrifennwch eich nodyn yma")?;
     file.sync_all()?;
-    process::Command::new("nano").arg(targed).spawn()?.wait()?;
-
+    if let Some(edit) = edit {
+        process::Command::new(edit).arg(targed).spawn()?.wait()?;
+    }
     Ok(())
 }
 
@@ -168,7 +176,7 @@ fn nodain_get(enw: &str, sylfaen: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn nodain_edit(enw: &str, sylfaen: &Path) -> io::Result<()> {
+fn nodain_edit(enw: &str, sylfaen: &Path, edit: Option<&str>) -> io::Result<()> {
     // check if it doesn't exist [if it does then return]
     let mut targed = sylfaen.join(enw);
     targed.set_extension("nod");
@@ -177,7 +185,9 @@ fn nodain_edit(enw: &str, sylfaen: &Path) -> io::Result<()> {
         println!("note of name '{}' doesn't exists", enw);
         return Ok(());
     }
-    process::Command::new("nano").arg(targed).spawn()?.wait()?;
+    if let Some(edit) = edit {
+        process::Command::new(edit).arg(targed).spawn()?.wait()?;
+    }
     Ok(())
 }
 
